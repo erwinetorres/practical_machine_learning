@@ -1,0 +1,164 @@
+---
+title: "PML_Course Project"
+author: "Erwin E. Torres"
+date: "November 25, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+Results and Discussions
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+1. Load necessary libraries
+```{r}
+getwd()
+setwd("C:/Users/Acer/Documents/DATA SCIENCE_DOST and COURSERA/Practical Machine Learning")
+library(caret)
+library(rattle)
+library(rpart)
+library(RColorBrewer)
+library(randomForest)
+library(gbm)
+```
+
+
+Load needed data.
+
+```{r}
+TrainingData <- read.csv("pml-training.csv")
+TestingData <- read.csv("pml-testing.csv")
+str(TrainingData)
+str(TestingData)
+```
+
+
+3. Perform data cleaning by removing NA, blank data, and unecessary indices
+
+```{r}
+indColToRemove <- which(colSums(is.na(TrainingData) |TrainingData=="")>0.8*dim(TrainingData)[1]) 
+Clean_TrainingData <- TrainingData[,-indColToRemove]
+Clean_TrainingData <- Clean_TrainingData[,-c(1:7)] # Removing unecessary variables
+dim(Clean_TrainingData)
+
+indColToRemove <- which(colSums(is.na(TestingData) |TestingData=="")>0.8*dim(TestingData)[1]) 
+Clean_TestingData <- TestingData[,-indColToRemove]
+Clean_TestingData <- Clean_TestingData[,-c(1:7)] # Removing unecessary variables
+dim(Clean_TestingData)
+
+```
+
+4.Create a partition of the traning data set (TrainDataClean)
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(Clean_TrainingData$classe, p=0.75, list=FALSE)
+Set_Training75 <- Clean_TrainingData[inTrain,] # Training data set, 75%
+Set_Testing25 <- Clean_TrainingData[-inTrain,] # Test data set, 25%
+```
+
+5. Train with classification trees
+
+```{r}
+Control_CT <- trainControl(method="cv", number=5)
+Model_CT <- train(classe~., data=Set_Training75, method="rpart", trControl=Control_CT)
+fancyRpartPlot(Model_CT$finalModel) #print(Model_CT)
+```
+
+6. Predict using classification trees using 25% test data.
+
+```{r}
+Pred_Training_CT <- predict(Model_CT,newdata=Set_Testing25)
+```
+
+7. Display confusion matrix and model accuracy
+
+```{r}
+ConfMat_CT <- confusionMatrix(Set_Testing25$classe,Pred_Training_CT)
+ConfMat_CT$table
+ConfMat_CT$overall[1]
+```
+The classificaiton trees can predict 54% of the classes correctly.
+
+
+8. Train with random forests
+
+```{r}
+set.seed(12345)
+Model_RF <- randomForest(classe~., data=Set_Training75, importance=TRUE)
+print(Model_RF)
+```
+
+
+9. Predict using random forests using 25% test data.
+
+```{r}
+Pred_Training_RF <- predict(Model_RF,newdata=Set_Testing25)
+```
+
+
+10. Display confusion matrix and model accuracy
+
+```{r}
+ConfMat_RF<- confusionMatrix(Set_Testing25$classe,Pred_Training_RF)
+ConfMat_RF$table
+ConfMat_RF$overall[1] # Shows the level of accuracy of the model
+```
+The random forest can predict 99% of the classes correctly.
+
+
+11. Train with gradient boosting method
+
+```{r}
+set.seed(12345)
+Control_GBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+Model_GBM  <- train(classe ~ ., data=Set_Training75, method = "gbm", trControl = Control_GBM, verbose = FALSE)
+Model_GBM$finalModel
+print(Model_GBM)
+```
+
+12. Predict using gradient boosting method using 25% test data.
+
+```{r}
+Pred_Training_GBM <- predict(Model_GBM,newdata=Set_Testing25)
+```
+
+13. Display confusion matrix and model accuracy
+
+```{r}
+ConfMat_GBM <- confusionMatrix(Set_Testing25$classe,Pred_Training_GBM)
+ConfMat_GBM$table
+ConfMat_GBM$overall[1]
+```
+The gradient boosting method can predict 96% of the classes correctly.
+
+
+Conclusion
+
+Among the three machine learning models, random forest can predict best at 99%. Thus, this model will be used to predict the classes of the 20 test data.
+```{r}
+Final_Pred_Test_RF<- predict(Model_RF,newdata=Clean_TestingData)
+Final_Pred_Test_RF
+```
+
+```{r}
+knitr::knit2html('PML_R Markdown.Rmd')
+```
+
